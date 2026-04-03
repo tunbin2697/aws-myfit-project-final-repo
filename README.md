@@ -1,4 +1,4 @@
-# MyFit Monorepo Showcase (Final Course Assignment)
+# MyFit Monorepo Showcase 
 
 This repository combines three project repositories into one monorepo to present the full MyFit platform end-to-end.
 
