@@ -1,0 +1,94 @@
+name: Deploy MyFit Frontend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  EXPO_PUBLIC_BACKEND_API_URL: https://myfit.click
+  EXPO_PUBLIC_COGNITO_URL: https://us-east-19aokpqzo1.auth.us-east-1.amazoncognito.com/login?client_id=661fm3mj7s5qcmoldri1mem9sr&response_type=code&scope=email+openid+profile
+  FRONTEND_BUCKET_NAME: myfitinfrastack-frontendbucketefe2e19c-qjcbf75eyxbx
+  CLOUDFRONT_DISTRIBUTION_ID: E3D9E3SXXZACHN
+
+concurrency:
+  group: deploy-frontend-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::294568841239:role/github-actions-deploy-myfit
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci || npm install
+
+      - name: Build Expo web
+        shell: bash
+        env:
+          EXPO_PUBLIC_NODE_ENV: production
+          EXPO_PUBLIC_BACKEND_API_URL: ${{ env.EXPO_PUBLIC_BACKEND_API_URL }}
+          EXPO_PUBLIC_COGNITO_URL: ${{ env.EXPO_PUBLIC_COGNITO_URL }}
+        run: |
+          set -euo pipefail
+
+          rm -rf dist web-build
+          npx expo export --platform web --clear
+
+      - name: Resolve web output directory
+        id: web-dir
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -d dist ]; then
+            echo "build_dir=dist" >> "$GITHUB_OUTPUT"
+          elif [ -d web-build ]; then
+            echo "build_dir=web-build" >> "$GITHUB_OUTPUT"
+          else
+            echo "Cannot find frontend output folder. Expected dist or web-build."
+            exit 1
+          fi
+
+      - name: Sync frontend to S3
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 sync "${{ steps.web-dir.outputs.build_dir }}" "s3://${{ env.FRONTEND_BUCKET_NAME }}" --delete --region "$AWS_REGION"
+
+      - name: Invalidate CloudFront
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws cloudfront create-invalidation --distribution-id "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" --paths "/*" --output text > /dev/null
+
+      - name: Print deployment summary
+        shell: bash
+        run: |
+          echo "Frontend deployed to bucket: ${{ env.FRONTEND_BUCKET_NAME }}"
+          echo "CloudFront distribution invalidated: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}"

@@ -1,0 +1,251 @@
+name: Deploy MyFit Backend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: myfit-backend
+  ECS_CLUSTER_PREFIX: MyfitInfraStack-Cluster
+  ECS_SERVICE_PREFIX: MyfitInfraStack-BackendService
+
+concurrency:
+  group: deploy-backend-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Debug OIDC token
+        run: |
+          echo "OIDC URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+          echo "OIDC TOKEN EXISTS?"
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
+            echo "❌ NO TOKEN"
+          else
+            echo "✅ TOKEN OK"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::294568841239:role/github-actions-deploy-myfit
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve ECS cluster and service
+        id: ecs-target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CLUSTER_ARNS=$(aws ecs list-clusters \
+            --region "$AWS_REGION" \
+            --query "clusterArns[?contains(@, '/${ECS_CLUSTER_PREFIX}') ]" \
+            --output text)
+
+          CLUSTER_COUNT=$(echo "$CLUSTER_ARNS" | awk 'NF {count+=NF} END {print count+0}')
+          if [ "$CLUSTER_COUNT" -eq 0 ]; then
+            echo "No ECS cluster found with prefix '$ECS_CLUSTER_PREFIX'."
+            exit 1
+          fi
+          if [ "$CLUSTER_COUNT" -gt 1 ]; then
+            echo "Multiple ECS clusters matched prefix '$ECS_CLUSTER_PREFIX': $CLUSTER_ARNS"
+            exit 1
+          fi
+
+          CLUSTER_ARN=$(echo "$CLUSTER_ARNS" | awk '{print $1}')
+          CLUSTER_NAME=$(echo "$CLUSTER_ARN" | awk -F/ '{print $NF}')
+
+          SERVICE_ARNS=$(aws ecs list-services \
+            --region "$AWS_REGION" \
+            --cluster "$CLUSTER_NAME" \
+            --query "serviceArns[?contains(@, '/${ECS_SERVICE_PREFIX}') ]" \
+            --output text)
+
+          SERVICE_COUNT=$(echo "$SERVICE_ARNS" | awk 'NF {count+=NF} END {print count+0}')
+          if [ "$SERVICE_COUNT" -eq 0 ]; then
+            echo "No ECS service found in cluster '$CLUSTER_NAME' with prefix '$ECS_SERVICE_PREFIX'."
+            exit 1
+          fi
+          if [ "$SERVICE_COUNT" -gt 1 ]; then
+            echo "Multiple ECS services matched prefix '$ECS_SERVICE_PREFIX': $SERVICE_ARNS"
+            exit 1
+          fi
+
+          SERVICE_ARN=$(echo "$SERVICE_ARNS" | awk '{print $1}')
+          SERVICE_NAME=$(echo "$SERVICE_ARN" | awk -F/ '{print $NF}')
+
+          echo "Using ECS cluster: $CLUSTER_NAME"
+          echo "Using ECS service: $SERVICE_NAME"
+
+          echo "cluster_name=$CLUSTER_NAME" >> "$GITHUB_OUTPUT"
+          echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build JAR
+        run: ./mvnw -q clean package -DskipTests
+
+      - name: Build and push Docker image
+        id: image-meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          IMAGE_URI_SHA="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:$IMAGE_TAG"
+          IMAGE_URI_LATEST="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:latest"
+
+          docker build -t "$IMAGE_URI_SHA" -t "$IMAGE_URI_LATEST" .
+          docker push "$IMAGE_URI_SHA"
+          docker push "$IMAGE_URI_LATEST"
+
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "image_uri=$IMAGE_URI_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve task definition ARN from ECS service
+        id: ecs-meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVICE_JSON=$(aws ecs describe-services \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --services '${{ steps.ecs-target.outputs.service_name }}' \
+            --output json)
+
+          TASK_DEF_ARN=$(echo "$SERVICE_JSON" | jq -r '.services[0].taskDefinition')
+          LB_CONTAINER_NAME=$(echo "$SERVICE_JSON" | jq -r '.services[0].loadBalancers[0].containerName // empty')
+          if [ -n "$LB_CONTAINER_NAME" ]; then
+            CONTAINER_NAME="$LB_CONTAINER_NAME"
+          else
+            CONTAINER_NAME=$(aws ecs describe-task-definition \
+              --region "$AWS_REGION" \
+              --task-definition "$TASK_DEF_ARN" \
+              --query 'taskDefinition.containerDefinitions[0].name' \
+              --output text)
+          fi
+          SUBNETS_JSON=$(echo "$SERVICE_JSON" | jq -c '.services[0].networkConfiguration.awsvpcConfiguration.subnets')
+          SECURITY_GROUPS_JSON=$(echo "$SERVICE_JSON" | jq -c '.services[0].networkConfiguration.awsvpcConfiguration.securityGroups')
+          ASSIGN_PUBLIC_IP=$(echo "$SERVICE_JSON" | jq -r '.services[0].networkConfiguration.awsvpcConfiguration.assignPublicIp // "DISABLED"')
+
+          echo "task_definition_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+          echo "container_name=$CONTAINER_NAME" >> "$GITHUB_OUTPUT"
+          echo "subnets_json=$SUBNETS_JSON" >> "$GITHUB_OUTPUT"
+          echo "security_groups_json=$SECURITY_GROUPS_JSON" >> "$GITHUB_OUTPUT"
+          echo "assign_public_ip=$ASSIGN_PUBLIC_IP" >> "$GITHUB_OUTPUT"
+
+      - name: Run migration task (must succeed)
+        id: migration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NETWORK_CONFIG=$(jq -cn \
+            --argjson subnets '${{ steps.ecs-meta.outputs.subnets_json }}' \
+            --argjson securityGroups '${{ steps.ecs-meta.outputs.security_groups_json }}' \
+            --arg assignPublicIp '${{ steps.ecs-meta.outputs.assign_public_ip }}' \
+            '{awsvpcConfiguration:{subnets:$subnets,securityGroups:$securityGroups,assignPublicIp:$assignPublicIp}}')
+
+          OVERRIDES=$(jq -cn \
+            --arg containerName '${{ steps.ecs-meta.outputs.container_name }}' \
+            '{containerOverrides:[{name:$containerName,command:["--run.migration=true"]}]}' )
+
+          RUN_TASK_JSON=$(aws ecs run-task \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --launch-type FARGATE \
+            --task-definition '${{ steps.ecs-meta.outputs.task_definition_arn }}' \
+            --count 1 \
+            --network-configuration "$NETWORK_CONFIG" \
+            --overrides "$OVERRIDES" \
+            --output json)
+
+          FAILURE_REASON=$(echo "$RUN_TASK_JSON" | jq -r '.failures[0].reason // empty')
+          if [ -n "$FAILURE_REASON" ]; then
+            echo "Failed to run migration task: $FAILURE_REASON"
+            exit 1
+          fi
+
+          TASK_ARN=$(echo "$RUN_TASK_JSON" | jq -r '.tasks[0].taskArn')
+          if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" = "null" ]; then
+            echo "Migration task ARN was not returned."
+            exit 1
+          fi
+
+          echo "migration_task_arn=$TASK_ARN" >> "$GITHUB_OUTPUT"
+
+          aws ecs wait tasks-stopped \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --tasks "$TASK_ARN"
+
+          DESCRIBE_JSON=$(aws ecs describe-tasks \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --tasks "$TASK_ARN" \
+            --output json)
+
+          EXIT_CODE=$(echo "$DESCRIBE_JSON" | jq -r --arg cname '${{ steps.ecs-meta.outputs.container_name }}' '.tasks[0].containers[] | select(.name==$cname) | .exitCode // empty' | head -n 1)
+          STOP_REASON=$(echo "$DESCRIBE_JSON" | jq -r '.tasks[0].stoppedReason // "No stop reason"')
+          CONTAINER_REASON=$(echo "$DESCRIBE_JSON" | jq -r --arg cname '${{ steps.ecs-meta.outputs.container_name }}' '.tasks[0].containers[] | select(.name==$cname) | .reason // empty' | head -n 1)
+
+          echo "Migration task stop reason: $STOP_REASON"
+          if [ -n "$CONTAINER_REASON" ]; then
+            echo "Migration container reason: $CONTAINER_REASON"
+          fi
+
+          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" != "0" ]; then
+            echo "Migration task failed (exitCode=${EXIT_CODE:-missing})."
+            exit 1
+          fi
+
+      - name: Deploy to ECS service
+        run: |
+          aws ecs update-service \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --service '${{ steps.ecs-target.outputs.service_name }}' \
+            --force-new-deployment > /dev/null
+
+      - name: Print rollout status (non-blocking)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SERVICE_JSON=$(aws ecs describe-services \
+            --region "$AWS_REGION" \
+            --cluster '${{ steps.ecs-target.outputs.cluster_name }}' \
+            --services '${{ steps.ecs-target.outputs.service_name }}' \
+            --output json)
+
+          PRIMARY_STATE=$(echo "$SERVICE_JSON" | jq -r '.services[0].deployments[] | select(.status=="PRIMARY") | .rolloutState')
+          DESIRED=$(echo "$SERVICE_JSON" | jq -r '.services[0].desiredCount')
+          RUNNING=$(echo "$SERVICE_JSON" | jq -r '.services[0].runningCount')
+          PENDING=$(echo "$SERVICE_JSON" | jq -r '.services[0].pendingCount')
+
+          echo "ECS primary rolloutState=$PRIMARY_STATE desired=$DESIRED running=$RUNNING pending=$PENDING"

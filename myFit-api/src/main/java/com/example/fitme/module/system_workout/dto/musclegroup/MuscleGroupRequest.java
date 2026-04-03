@@ -1,0 +1,25 @@
+package com.example.fitme.module.system_workout.dto.musclegroup;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Request DTO for creating/updating muscle groups.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MuscleGroupRequest {
+
+    @NotBlank(message = "Muscle group name cannot be blank")
+    @Size(max = 100, message = "Muscle group name must not exceed 100 characters")
+    private String name;
+
+    @Size(max = 500, message = "Description must not exceed 500 characters")
+    private String description;
+}

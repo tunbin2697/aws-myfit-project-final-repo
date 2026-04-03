@@ -1,0 +1,15 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+
+# Local/derived CloudFormation snapshots
+cfn.out.json
+cfn.out.yaml
+cfn.domain.out.yaml
+live-template.json
+live-template.yaml
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
