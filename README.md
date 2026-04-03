@@ -1,4 +1,4 @@
-# MyFit Monorepo Showcase 
+# Cloud-Native Fitness App Deployment on AWS
 
 This repository combines three project repositories into one monorepo to present the full MyFit platform end-to-end.
 
