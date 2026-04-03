@@ -1,0 +1,51 @@
+Chatbot Implementation
+
+Features
+AI Fitness Coaching: Một trợ lý AI tương tác được cung cấp bởi Anthropic Claude 3.5 Haiku/Sonnet thông qua AWS Bedrock, được cấu hình cụ thể để hoạt động như một trợ lý huấn luyện thể hình hữu ích.
+Persistent Chat History (Lịch sử trò chuyện bền vững): Lưu trữ đầy đủ tất cả các tương tác trò chuyện. Mọi tin nhắn, phản hồi và siêu dữ liệu (lượng token sử dụng, thời gian phản hồi) đều được lưu trữ trong cơ sở dữ liệu, cho phép người dùng truy cập lịch sử của họ qua các phiên.
+Usage Tracking & Rate Limiting (Theo dõi sử dụng & Giới hạn tỷ lệ):
+Theo dõi động mức tiêu thụ token (token đầu vào so với token đầu ra).
+Giới hạn tỷ lệ tích hợp để đảm bảo sử dụng công bằng.
+Hiển thị hạn ngạch yêu cầu còn lại theo thời gian thực trong giao diện người dùng ứng dụng di động.
+Real-Time Feedback (Phản hồi thời gian thực): Giao diện người dùng frontend đáp ứng với các chỉ báo tải tự động, dấu thời gian tin nhắn và xử lý lỗi cho các sự cố kết nối.
+Service Health Monitoring (Giám sát tình trạng dịch vụ): Một điểm cuối kiểm tra tình trạng chuyên dụng (/api/chatbot/health) cho phép hệ thống xác minh tính khả dụng của dịch vụ AI trước khi người dùng tương tác.
+System Flow
+
+Chatbot hoạt động thông qua kiến trúc đa tầng liên quan đến frontend di động, backend Java và dịch vụ AWS Bedrock:
+Frontend Request (myFit-FrontEnd):
+Người dùng gửi tin nhắn qua ChatbotScreen.
+chatbotService.ts thực hiện yêu cầu POST đã được xác thực tới điểm cuối /api/chatbot của backend, gửi tin nhắn của người dùng và token bảo mật JWT.
+Backend Orchestration (myFit-api):
+ChatbotController nhận yêu cầu và chuyển nó đến ChatbotService.
+Dịch vụ chuẩn bị yêu cầu bằng cách giải quyết mô hình AI, nhiệt độ và lời nhắc hệ thống ("You are a helpful fitness coaching assistant.").
+Bedrock Service Call:
+Backend thực hiện cuộc gọi REST trực tiếp đến AWS Bedrock Runtime API (điểm cuối invoke).
+Authentication (Xác thực): Sử dụng tiêu đề Authorization: Bearer A... cụ thể (Bedrock API Key) để ủy quyền cho yêu cầu.
+Payload (Tải trọng): Gửi một JSON có cấu trúc theo định dạng Anthropic Claude:
+{
+  "anthropic_version": "bedrock-2023-05-31",
+  "system": "You are a helpful fitness coaching assistant.",
+  "messages": [{ "role": "user", "content": [{ "type": "text", "text": "user_query" }] }],
+  "max_tokens": 1024,
+  "temperature": 0.7
+}
+Persistence & Response (Lưu trữ & Phản hồi):
+Khi nhận được phản hồi từ AWS, backend phân tích cú pháp văn bản được tạo và dữ liệu sử dụng token.
+Tương tác được lưu vào cơ sở dữ liệu thông qua ChatbotMessageRepository.
+Phản hồi cuối cùng được trả về ứng dụng di động để hiển thị.
+AWS Bedrock Settings
+
+Việc triển khai hiện đang sử dụng các cấu hình kỹ thuật sau cho việc tạo AI:
+Model Configuration (Cấu hình mô hình):
+Active Model (Mô hình đang hoạt động): anthropic.claude-3-5-haiku-20241022-v1:0 (Hardcoded để có tốc độ phản hồi cao).
+Fallback/Configurable Model (Mô hình dự phòng/có thể cấu hình): anthropic.claude-3-sonnet-20240229.
+Runtime Environment (Môi trường Runtime):
+Active Region (Khu vực đang hoạt động): us-west-2 (Hardcoded trong lớp dịch vụ).
+Configurable Region (Khu vực có thể cấu hình): ap-southeast-1 (Mặc định môi trường chính).
+Generation Parameters (Tham số tạo):
+Max Tokens (Token tối đa): 1024 (Độ dài tối đa của phản hồi AI).
+Temperature (Nhiệt độ): 0.7 (Cân bằng giữa tính sáng tạo và độ chính xác thực tế).
+API Protocol (Giao thức API): bedrock-2023-05-31.
+Authentication Mechanism (Cơ chế xác thực):
+Tích hợp REST trực tiếp sử dụng Authorization Bearer Token (Api key:”A..”.) tùy chỉnh được liên kết với AWS Bedrock API Gateway.
+
