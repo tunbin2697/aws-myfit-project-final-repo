@@ -12,7 +12,7 @@ MyFit is a fitness platform deployed on AWS, with:
 
 ## 1) Project Purpose
 
-This monorepo is organized for graders to quickly understand how the complete system is structured and deployed:
+This monorepo is organized to quickly understand how the complete system is structured and deployed:
 - Application logic and APIs (backend)
 - Mobile/web client experience (frontend)
 - Cloud infrastructure and deployment automation (infra)
@@ -32,7 +32,7 @@ final repo/
 
 ---
 
-## 3) Quick Navigation (For Graders)
+## 3) Quick Navigation
 
 ### Main sections
 - Backend API folder: [myFit-api](myFit-api/)
@@ -141,7 +141,7 @@ See details: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedr
 
 ## 7) Assignment Context
 
-For this final assignment showcase, the original repositories were combined into this monorepo so the grader can evaluate:
+For this final assignment showcase, the original repositories were combined into this monorepo to make evaluation straightforward across:
 - Full-stack implementation quality
 - Cloud architecture and deployment readiness
 - AI feature integration within a production-style platform structure
