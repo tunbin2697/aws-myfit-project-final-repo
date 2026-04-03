@@ -2,11 +2,21 @@
 
 This repository combines three project repositories into one monorepo to present the full MyFit platform end-to-end.
 
+## Internship Reports
+
+| Member | Report URL |
+| --- | --- |
+| Võ Quốc Bảo Khang | [https://tunbin2697.github.io/facj-worklog-/](https://tunbin2697.github.io/facj-worklog-/) |
+| Nguyễn Minh Khang | [https://minhkhang17.github.io/worklogAws/](https://minhkhang17.github.io/worklogAws/) |
+| Hoàng Phạm Gia Bảo | [https://baohoang2005.github.io/AWS_WORKLOG/](https://baohoang2005.github.io/AWS_WORKLOG/) |
+| Lê Nguyễn Thiên Danh | [https://chrislee1901.github.io/fcj-workshop-template/](https://chrislee1901.github.io/fcj-workshop-template/) |
+| Trương Đình Lộc | [https://superziggs.github.io/Internship-report/](https://superziggs.github.io/Internship-report/) |
+
 MyFit is a fitness platform deployed on AWS, with:
 - A Spring Boot backend API
 - A React Native (Expo) frontend app
 - AWS infrastructure as code (CDK) and deployment scripts
-- AI chatbot integration via AWS Bedrock (inside the infra scope)
+- AI chatbot integration through backend services
 
 ---
 
@@ -43,7 +53,6 @@ final repo/
 - Backend detailed README: [myFit-api/README.md](myFit-api/README.md)
 - Frontend detailed README: [myFit-FrontEnd/README.md](myFit-FrontEnd/README.md)
 - Infrastructure detailed README: [myfit-deploy-infra/README.md](myfit-deploy-infra/README.md)
-- Bedrock chatbot notes: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedrock%20chatbot/README)
 
 ---
 
@@ -55,7 +64,7 @@ The backend is a Java 17 + Spring Boot 3 REST API that powers core platform feat
 - Authentication and token validation (AWS Cognito integration)
 - Workout plans, exercises, user sessions, nutrition, and profile data
 - Media URL handling (S3 + CloudFront)
-- AI chatbot endpoint integration with AWS Bedrock
+- AI chatbot endpoint integration
 - PostgreSQL persistence with Flyway migrations
 
 Backend is containerized (Docker), supports local development via Maven or Docker Compose, and is designed for cloud deployment.
@@ -89,18 +98,6 @@ This section includes practical runbooks for deployment, debugging, and rollback
 
 See details: [myfit-deploy-infra/README.md](myfit-deploy-infra/README.md)
 
-### D. Bedrock Chatbot (inside infra scope)
-
-Bedrock chatbot integration is documented under the infra project and explains:
-- AI model usage with Anthropic Claude through AWS Bedrock
-- Chat flow from frontend to backend to Bedrock runtime
-- Persistent chat history and token usage tracking
-- Service health endpoint and reliability behavior
-
-See details: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedrock%20chatbot/README)
-
----
-
 ## 5) Highlights From Each Child README
 
 ### Backend Highlights
@@ -121,12 +118,6 @@ See details: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedr
 - Operational runbooks for failure handling and diagnostics
 - Cloud outputs usage to avoid hardcoded deployment values
 
-### Bedrock Highlights
-- AI fitness coaching assistant behavior and system prompt strategy
-- Message persistence, token accounting, and usage controls
-- API protocol details and model/runtime configuration choices
-- Health monitoring endpoint for service readiness checks
-
 ---
 
 ## 6) Suggested Exploration Path (5-10 Minutes)
@@ -135,7 +126,6 @@ See details: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedr
 2. Open backend README for domain/API architecture: [myFit-api/README.md](myFit-api/README.md)
 3. Open frontend README for client behavior and integration: [myFit-FrontEnd/README.md](myFit-FrontEnd/README.md)
 4. Open infra README for deployment architecture and scripts: [myfit-deploy-infra/README.md](myfit-deploy-infra/README.md)
-5. Open Bedrock notes for AI/chatbot implementation details: [myfit-deploy-infra/bedrock chatbot/README](myfit-deploy-infra/bedrock%20chatbot/README)
 
 ---
 
