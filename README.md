@@ -1,7 +1,8 @@
-# Cloud-Native Fitness App Deployment on AWS
+# Cloud-Native Fitness Platform on AWS
 
-This repository combines three project repositories into one monorepo to present the full MyFit platform end-to-end.
+This repository combines the three project repositories into one monorepo to present the full MyFit platform end-to-end, from user experience to cloud deployment.
 
+Live application: myfit.click
 ## Internship Reports
 
 | Member | Report URL |
@@ -12,9 +13,9 @@ This repository combines three project repositories into one monorepo to present
 | Lê Nguyễn Thiên Danh | [https://chrislee1901.github.io/fcj-workshop-template/](https://chrislee1901.github.io/fcj-workshop-template/) |
 | Trương Đình Lộc | [https://superziggs.github.io/Internship-report/](https://superziggs.github.io/Internship-report/) |
 
-MyFit is a fitness platform deployed on AWS, with:
-- A Spring Boot backend API
-- A React Native (Expo) frontend app
+MyFit is a cloud-native fitness platform designed to support users across their health and workout journey, with:
+- A Spring Boot backend API secured with Cognito and JWT
+- A React Native (Expo) frontend app for mobile and web
 - AWS infrastructure as code (CDK) and deployment scripts
 - AI chatbot integration through backend services
 
@@ -22,12 +23,12 @@ MyFit is a fitness platform deployed on AWS, with:
 
 ## 1) Project Purpose
 
-This monorepo is organized to quickly understand how the complete system is structured and deployed:
+This monorepo is organized to make the full system easy to understand and evaluate:
 - Application logic and APIs (backend)
 - Mobile/web client experience (frontend)
 - Cloud infrastructure and deployment automation (infra)
 
-The goal of this showcase is to demonstrate integration across software engineering, cloud deployment, and AI-enabled features in one coherent platform.
+The goal of this showcase is to demonstrate a stable, scalable, and secure AWS-based solution that connects frontend, backend, and infrastructure into one coherent platform.
 
 ---
 
@@ -89,10 +90,10 @@ See details: [myFit-FrontEnd/README.md](myFit-FrontEnd/README.md)
 Infrastructure is defined with AWS CDK and deployment automation scripts:
 - ECS Fargate backend service behind ALB
 - ECR image registry
-- RDS PostgreSQL and ElastiCache Redis (private subnets)
+- RDS PostgreSQL in private subnets
 - S3 + CloudFront hosting for frontend
 - CloudFront path routing to backend API paths
-- Deployment scripts for infra and app rollout
+- Deployment scripts for infrastructure and application rollout
 
 This section includes practical runbooks for deployment, debugging, and rollback scenarios.
 
@@ -136,4 +137,4 @@ For this final assignment showcase, the original repositories were combined into
 - Cloud architecture and deployment readiness
 - AI feature integration within a production-style platform structure
 
-This layout is intentionally documentation-first to make project navigation and evaluation straightforward.
+This layout is intentionally documentation-first so the project goal, architecture, and deployment flow are easy to review from the root level.
