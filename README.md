@@ -2,7 +2,7 @@
 
 This repository combines the three project repositories into one monorepo to present the full MyFit platform end-to-end, from user experience to cloud deployment.
 
-Live application: myfit.click
+Live application: https://myfit.click
 ## Internship Reports
 
 | Member | Report URL |
